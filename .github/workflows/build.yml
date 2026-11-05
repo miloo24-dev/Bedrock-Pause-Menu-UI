@@ -6,11 +6,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: bedrock-pause-menu
     steps:
       - uses: actions/checkout@v4
+
+      - name: Siapkan source
+        run: |
+          mkdir -p _src
+          shopt -s nullglob
+          for z in *.zip; do unzip -oq "$z" -d _src; done
+          echo "Struktur repo:"
+          find . -maxdepth 4 -not -path './.git/*' | sort
+          SETTINGS=$(find . -name settings.gradle -not -path './.git/*' | head -1)
+          if [ -z "$SETTINGS" ]; then
+            echo "::error::settings.gradle tidak ditemukan. Pastikan file .zip project sudah di-upload ke root repo."
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
@@ -20,17 +31,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: current
-          build-root-directory: bedrock-pause-menu
 
       - name: Build
+        working-directory: ${{ env.PROJECT_DIR }}
         run: gradle clean build --no-daemon --stacktrace
-
-      - name: Daftar jar hasil build
-        run: ls -la build/libs
 
       - uses: actions/upload-artifact@v4
         with:
           name: bedrock-pause-menu-${{ github.run_number }}
           path: |
-            bedrock-pause-menu/build/libs/*.jar
-            !bedrock-pause-menu/build/libs/*-sources.jar
+            ${{ env.PROJECT_DIR }}/build/libs/*.jar
+            !${{ env.PROJECT_DIR }}/build/libs/*-sources.jar
